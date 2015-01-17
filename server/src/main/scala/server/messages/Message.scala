@@ -21,11 +21,11 @@ object Message {
   def deserialize(serialized: String): Option[Message] = {
     val jsonObj = serialized.parseJson.asJsObject
 
-    jsonObj.getFields("id").head match {
+    jsonObj.getFields("id").headOption.flatMap(value => value match {
       case JsString(AuthRequest.id) => Some(jsonObj.convertTo[AuthRequest])
       case JsString(ChatMessage.id) => Some(jsonObj.convertTo[ChatMessage])
       case _ => None
-    }
+    })
   }
 
 }
