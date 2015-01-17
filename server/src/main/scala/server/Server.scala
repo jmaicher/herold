@@ -4,6 +4,7 @@ import java.net.{Socket, ServerSocket}
 import java.util.concurrent.{Executors, ExecutorService}
 
 import akka.actor.{Props, ActorSystem, Actor}
+import server.messages.Message
 import server.receiver.{Handler, SendBackHandler, Receiver}
 import server.sender.Sender
 
@@ -33,8 +34,9 @@ class SocketActor(val socket: Socket) extends Actor with Handler {
   val receiver = new Receiver(socket, this)
   receiver.listen()
 
-  override def handle(message: String): Unit = {
-    println("received: "+message)
+  override def handle(json: String): Unit = Message.deserialize(json) match {
+    case Some(msg) => println("Rcv: "+ msg.serialize())
+    case _ =>
   }
 
   def receive = {
