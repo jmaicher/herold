@@ -20,7 +20,7 @@ object HeroldJsonProtocol extends DefaultJsonProtocol {
 
 object Server {
   def main(args: Array[String]): Unit = {
-    new Server(2020, 2).run
+    new Server(2020, 2).run()
   }
 }
 
