@@ -3,13 +3,16 @@ package server
 import java.net.{Socket, ServerSocket}
 import java.util.concurrent.{Executors, ExecutorService}
 
+import server.receiver.{SendBackHandler, Receiver}
+import server.sender.Sender
+
 object Server {
   def main(args: Array[String]): Unit = {
-    (new HeroldServer(2020, 2)).run
+    new Server(2020, 2).run
   }
 }
 
-class HeroldServer(port: Int, poolSize: Int) extends Runnable {
+class Server(port: Int, poolSize: Int) extends Runnable {
   val serverSocket = new ServerSocket(port)
   val pool: ExecutorService = Executors.newFixedThreadPool(poolSize)
 
@@ -17,7 +20,7 @@ class HeroldServer(port: Int, poolSize: Int) extends Runnable {
     try {
       while (true) {
         val socket = serverSocket.accept()
-        pool.execute(new Handler(socket))
+        pool.execute(new SocketHandler(socket))
       }
     } finally {
       pool.shutdown()
@@ -25,9 +28,13 @@ class HeroldServer(port: Int, poolSize: Int) extends Runnable {
   }
 }
 
-class Handler(socket: Socket) extends Runnable {
+class SocketHandler(socket: Socket) extends Runnable {
   def run(): Unit = {
-    socket.getOutputStream.write("Hello client".getBytes())
+    val receiver = new Receiver(socket, new SendBackHandler(new Sender(socket)))
+    receiver.listen()
+    while(true) {
+
+    }
     socket.getOutputStream.close()
   }
 }
