@@ -5,18 +5,6 @@ import java.util.concurrent.{Executors, ExecutorService}
 
 import server.receiver.{SendBackHandler, Receiver}
 import server.sender.Sender
-import spray.json.{DefaultJsonProtocol}
-
-case class Message(id: String, body: String)
-
-object Message {
-  val id = "h/m"
-  def apply(body: String): Message = apply(id, body)
-}
-
-object HeroldJsonProtocol extends DefaultJsonProtocol {
-  implicit val messageFormat = jsonFormat2(Message.apply)
-}
 
 object Server {
   def main(args: Array[String]): Unit = {
