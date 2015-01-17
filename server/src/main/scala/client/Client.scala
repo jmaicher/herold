@@ -3,8 +3,12 @@ package client
 import java.net.{InetAddress, Socket}
 import java.util.Scanner
 
+import server.Message
 import server.receiver.{ConsolePrintHandler, Receiver}
 import server.sender.Sender
+
+import server.HeroldJsonProtocol._
+import spray.json.pimpAny
 
 object Client {
   def main(args: Array[String]) {
@@ -23,8 +27,9 @@ class TestClient extends Runnable {
     val in = new Scanner(System.in)
 
     while(true) {
-      val message = in.nextLine()
-      sender.send(message)
+      val body = in.nextLine()
+      val message = Message(body)
+      sender.send(message.toJson.compactPrint)
     }
   }
 }

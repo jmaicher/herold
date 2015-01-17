@@ -1,13 +1,14 @@
 package server.receiver
 
+import server.Message
 import server.sender.Sender
 
+import spray.json._
 import server.HeroldJsonProtocol._
-import spray.json.pimpAny
 
 class SendBackHandler(sender: Sender) extends Handler{
-  override def handle(message: String): Unit = {
-    val msg = server.Message(message).toJson.compactPrint
-    sender.send(msg)
+  override def handle(json: String): Unit = {
+    val message = json.parseJson.convertTo[Message]
+    sender.send(message.toJson.compactPrint)
   }
 }
