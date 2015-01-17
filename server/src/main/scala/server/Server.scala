@@ -3,7 +3,8 @@ package server
 import java.net.{Socket, ServerSocket}
 import java.util.concurrent.{Executors, ExecutorService}
 
-import server.receiver.{SendBackHandler, Receiver}
+import akka.actor.{Props, ActorSystem, Actor}
+import server.receiver.{Handler, SendBackHandler, Receiver}
 import server.sender.Sender
 import spray.json.{DefaultJsonProtocol}
 
@@ -26,23 +27,29 @@ object Server {
 
 class Server(port: Int, poolSize: Int) extends Runnable {
   val serverSocket = new ServerSocket(port)
-  val pool: ExecutorService = Executors.newFixedThreadPool(poolSize)
+  val system = ActorSystem()
 
   def run(): Unit = {
     try {
       while (true) {
-        val socket = serverSocket.accept()
-        pool.execute(new SocketHandler(socket))
+          system.actorOf(Props(classOf[SocketActor], serverSocket.accept()))
       }
     } finally {
-      pool.shutdown()
+      system.shutdown()
     }
   }
 }
 
-class SocketHandler(socket: Socket) extends Runnable {
-  def run(): Unit = {
-    val receiver = new Receiver(socket, new SendBackHandler(new Sender(socket)))
-    receiver.listen()
+class SocketActor(val socket: Socket) extends Actor with Handler {
+
+  val receiver = new Receiver(socket, this)
+  receiver.listen()
+
+  override def handle(message: String): Unit = {
+    println("received: "+message)
+  }
+
+  def receive = {
+    case _ => println("received some message")
   }
 }
