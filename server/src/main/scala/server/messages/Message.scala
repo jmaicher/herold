@@ -53,3 +53,16 @@ object ChatMessage {
   val USER = "u"
   val GROUP = "g"
 }
+
+
+case class ServerReply(id: String, uuid: String, status: Int)
+
+object ServerReply {
+  val id = "r"
+  def apply(uuid: String, status: Int): ServerReply = apply(id, uuid, status)
+
+  val OK = 200
+  val ACCEPTED = 202
+  val BAD_REQUEST = 400
+  val UNAUTHORIZED = 401
+}
