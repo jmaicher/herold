@@ -3,7 +3,7 @@ package server.messages
 import spray.json._
 
 object MessageJsonProtocol extends DefaultJsonProtocol {
-  implicit val authRequestFormat = jsonFormat3(AuthRequest.apply)
+  implicit val authRequestFormat = jsonFormat4(AuthRequest.apply)
   implicit val chatMessageFormat = jsonFormat6(ChatMessage.apply)
   implicit val serverReplyFormat = jsonFormat3(ServerReply.apply)
 }
@@ -32,14 +32,14 @@ object Message {
 
 }
 
-case class AuthRequest(id: String, uuid: String, token: String)
+case class AuthRequest(id: String, uuid: String, userId: String, token: String)
   extends Message {
   override def serialize(): String = this.toJson.compactPrint
 }
 
 object AuthRequest {
   val id = "a"
-  def apply(uuid: String, token: String): AuthRequest = apply(id, uuid, token)
+  def apply(uuid: String, userId: String, token: String): AuthRequest = apply(id, uuid, userId, token)
 }
 
 case class ChatMessage(id: String, uuid: String, from: Int, to: Int, toType: String, body: String)

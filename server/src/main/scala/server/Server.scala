@@ -47,7 +47,8 @@ class SocketActor(val socket: Socket, val authenticator: Authenticator) extends 
   def authenticated: Receive = {
     case msg: ChatMessage => {
       logger.debug("received: "+msg)
-      _sender.send(msg)
+      val reply = ChatMessage("2", msg.to, msg.from, "user", "Re: "+msg.body)
+      _sender.send(reply)
     }
     case msg: Message => {
       logger.debug("received unhandled message: " + msg)
