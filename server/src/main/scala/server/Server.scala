@@ -3,10 +3,9 @@ package server
 import java.net.{Socket, ServerSocket}
 import java.util.concurrent.{ConcurrentHashMap, ConcurrentMap, Executors, ExecutorService}
 
-import akka.actor.{ActorLogging, Props, ActorSystem, Actor}
+import akka.actor._
 import com.typesafe.scalalogging.{LazyLogging, Logger}
-import server.authentication.Authenticator
-import akka.actor.{Props, ActorSystem, Actor}
+import server.authentication.{User, Authenticator}
 import server.messages.{ServerReply, ChatMessage, AuthRequest, Message}
 import server.receiver.{Handler, SendBackHandler, Receiver}
 import server.sender.Sender
@@ -21,12 +20,14 @@ class Server(port: Int, poolSize: Int) extends Runnable with LazyLogging {
   val serverSocket = new ServerSocket(port)
   val system = ActorSystem()
   val authenticator = new Authenticator
+  val registry = new Registry
+  val broker = system.actorOf(Props(classOf[MessageBroker], registry))
 
   def run(): Unit = {
     logger.info("server is running")
     try {
       while (true) {
-          system.actorOf(Props(classOf[SocketActor], serverSocket.accept(), authenticator))
+          system.actorOf(Props(classOf[SocketActor], serverSocket.accept(), authenticator, registry, broker))
       }
     } finally {
       system.shutdown()
@@ -34,7 +35,43 @@ class Server(port: Int, poolSize: Int) extends Runnable with LazyLogging {
   }
 }
 
-class SocketActor(val socket: Socket, val authenticator: Authenticator) extends Actor with Handler with LazyLogging {
+class Registry {
+  private val userMap = new scala.collection.mutable.LinkedHashMap[Int, ActorRef]
+
+  def register(id: Int, actor: ActorRef) = {
+    userMap.synchronized {
+      userMap += id -> actor
+    }
+  }
+
+  def unregister(id: Int) = {
+    userMap.synchronized {
+      userMap - id
+    }
+  }
+
+  def getActorFor(id: Int): Option[ActorRef] = {
+    userMap.synchronized {
+      userMap.get(id)
+    }
+  }
+}
+
+class MessageBroker(val registry: Registry) extends Actor with LazyLogging {
+  def receive = {
+    case msg: ChatMessage => registry.getActorFor(msg.to) match {
+      case Some(actor) => actor forward msg
+      case _ => {
+        logger.debug("Cannot deliver message, recipient $msg.to not connected")
+      }
+    }
+    case _ =>
+  }
+}
+
+class SocketActor(val socket: Socket, val authenticator: Authenticator, val registry: Registry, val broker: ActorRef)
+  extends Actor with Handler with LazyLogging {
+
   import context._
   private val _sender = new Sender(socket)
   private val receiver = new Receiver(socket, this)
@@ -44,11 +81,10 @@ class SocketActor(val socket: Socket, val authenticator: Authenticator) extends 
     self ! message
   }
 
-  def authenticated: Receive = {
-    case msg: ChatMessage => {
-      logger.debug("received: "+msg)
-      val reply = ChatMessage("2", msg.to, msg.from, "user", "Re: "+msg.body)
-      _sender.send(reply)
+  def authenticated(user: User): Receive = {
+    case msg: ChatMessage => msg.to match {
+      case user.id => _sender.send(msg)
+      case _ => broker ! msg
     }
     case msg: Message => {
       logger.debug("received unhandled message: " + msg)
@@ -60,16 +96,17 @@ class SocketActor(val socket: Socket, val authenticator: Authenticator) extends 
 
   //default receive when not authenticated yet
   def receive = {
-    case msg: AuthRequest => {
-      logger.debug("received: "+msg)
-      if (authenticator.authenticate(msg)) {
-        become(authenticated)
+    case authReq: AuthRequest => authenticator.authenticate(authReq) match {
+      case Some(user) => {
+        become(authenticated(user))
+        registry.register(user.id, self)
         logger.debug("authentication successful")
-        val reply = ServerReply(msg.uuid, ServerReply.OK)
+        val reply = ServerReply(authReq.uuid, ServerReply.OK)
         _sender.send(reply)
-      } else {
+      }
+      case _ => {
         logger.debug("authentication failed")
-        val reply = ServerReply(msg.uuid, ServerReply.BAD_REQUEST)
+        val reply = ServerReply(authReq.uuid, ServerReply.BAD_REQUEST)
         _sender.send(reply)
       }
     }

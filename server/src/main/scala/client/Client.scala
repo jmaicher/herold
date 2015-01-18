@@ -31,7 +31,7 @@ class TestClient extends Runnable with LazyLogging {
     println("Please enter token")
     val token = in.nextLine()
 
-    val authRequest = AuthRequest("1", id.toString, token)
+    val authRequest = AuthRequest("1", id, token)
 
     val receiver = new Receiver(socket, new Handler {
       override def handle(message: Message): Unit = {
@@ -57,7 +57,7 @@ class TestClient extends Runnable with LazyLogging {
     sender.send(authRequest)
   }
 
-  def startChat(userId: String): Unit = {
+  def startChat(userId: Int): Unit = {
 
     val receiver = new Receiver(socket, new Handler {
       override def handle(message: Message): Unit = {

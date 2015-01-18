@@ -32,14 +32,14 @@ object Message {
 
 }
 
-case class AuthRequest(id: String, uuid: String, userId: String, token: String)
+case class AuthRequest(id: String, uuid: String, userId: Int, token: String)
   extends Message {
   override def serialize(): String = this.toJson.compactPrint
 }
 
 object AuthRequest {
   val id = "a"
-  def apply(uuid: String, userId: String, token: String): AuthRequest = apply(id, uuid, userId, token)
+  def apply(uuid: String, userId: Int, token: String): AuthRequest = apply(id, uuid, userId, token)
 }
 
 case class ChatMessage(id: String, uuid: String, from: Int, to: Int, toType: String, body: String)
