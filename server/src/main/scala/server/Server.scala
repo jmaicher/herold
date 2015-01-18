@@ -1,13 +1,12 @@
 package server
 
 import java.net.{Socket, ServerSocket}
-import java.util.concurrent.{ConcurrentHashMap, ConcurrentMap, Executors, ExecutorService}
 
 import akka.actor._
-import com.typesafe.scalalogging.{LazyLogging, Logger}
+import com.typesafe.scalalogging.{LazyLogging}
 import server.authentication.{User, Authenticator}
 import server.messages.{ServerReply, ChatMessage, AuthRequest, Message}
-import server.receiver.{Handler, SendBackHandler, Receiver}
+import server.receiver.{Handler, Receiver}
 import server.sender.Sender
 
 object Server {
@@ -62,6 +61,7 @@ class MessageBroker(val registry: Registry) extends Actor with LazyLogging {
     case msg: ChatMessage => registry.getActorFor(msg.to) match {
       case Some(actor) => actor forward msg
       case _ => {
+        sender() ! ServerReply(msg.uuid, ServerReply.ACCEPTED)
         logger.debug("Cannot deliver message, recipient $msg.to not connected")
       }
     }
@@ -83,12 +83,13 @@ class SocketActor(val socket: Socket, val authenticator: Authenticator, val regi
 
   def authenticated(user: User): Receive = {
     case msg: ChatMessage => msg.to match {
-      case user.id => _sender.send(msg)
+      case user.id => {
+        _sender.send(msg)
+        sender() ! ServerReply(msg.uuid, ServerReply.OK)
+      }
       case _ => broker ! msg
     }
-    case msg: Message => {
-      logger.debug("received unhandled message: " + msg)
-      val reply = ServerReply(msg.uuid, ServerReply.NOT_FOUND)
+    case reply: ServerReply => {
       _sender.send(reply)
     }
     case _ =>
@@ -109,11 +110,6 @@ class SocketActor(val socket: Socket, val authenticator: Authenticator, val regi
         val reply = ServerReply(authReq.uuid, ServerReply.BAD_REQUEST)
         _sender.send(reply)
       }
-    }
-    case msg: Message => {
-      logger.debug("received unhandled message: " + msg)
-      val reply = ServerReply(msg.uuid, ServerReply.NOT_FOUND)
-      _sender.send(reply)
     }
     case _ =>
   }
