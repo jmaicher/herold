@@ -7,7 +7,7 @@ import akka.actor.{ActorLogging, Props, ActorSystem, Actor}
 import com.typesafe.scalalogging.{LazyLogging, Logger}
 import server.authentication.Authenticator
 import akka.actor.{Props, ActorSystem, Actor}
-import server.messages.Message
+import server.messages.{ChatMessage, AuthRequest, Message}
 import server.receiver.{Handler, SendBackHandler, Receiver}
 import server.sender.Sender
 
@@ -40,31 +40,31 @@ class SocketActor(val socket: Socket, val authenticator: Authenticator) extends 
   private val receiver = new Receiver(socket, this)
   receiver.listen()
 
-  override def handle(json: String): Unit = Message.deserialize(json) match {
-    case Some(msg) => println("Rcv: "+ msg.serialize())
-    case _ =>
+  override def handle(message: Message): Unit = {
+    self ! message
   }
 
   def authenticated: Receive = {
-    case m: String => {
-      logger.debug("received: "+m)
-      _sender.send(m)
+    case msg: ChatMessage => {
+      logger.debug("received: "+msg)
+      _sender.send(msg)
     }
+    case _ => logger.debug("received msg that is not handled")
   }
 
   //default receive when not authenticated yet
   def receive = {
-    case m: String => {
-      logger.debug("received: "+m)
-      if (authenticator.authenticate(m)) {
-        logger.debug("authentication successful")
+    case msg: AuthRequest => {
+      logger.debug("received: "+msg)
+      if (authenticator.authenticate(msg)) {
         become(authenticated)
-        _sender.send(m) // TODO: success message?
+        logger.debug("authentication successful")
+        //_sender.send(m) // TODO: success message?
       } else {
         logger.debug("authentication failed")
-        _sender.send(m) // TODO: error message?
+        //_sender.send(m) // TODO: error message?
       }
     }
-    case _ =>
+    case _ => logger.debug("received msg that is not handled")
   }
 }

@@ -1,5 +1,7 @@
 package server.receiver
 
+import server.messages.Message
+
 trait Handler {
-  def handle(message: String)
+  def handle(message: Message)
 }

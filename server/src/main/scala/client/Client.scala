@@ -3,8 +3,8 @@ package client
 import java.net.{InetAddress, Socket}
 import java.util.Scanner
 
-import server.messages.ChatMessage
-import server.receiver.{ConsolePrintHandler, Receiver}
+import server.messages.{Message, AuthRequest}
+import server.receiver.{Handler, Receiver}
 import server.sender.Sender
 
 object Client {
@@ -15,9 +15,14 @@ object Client {
 
 class TestClient extends Runnable {
   val socket = new Socket(InetAddress.getLocalHost, 2020)
+  var authenticated = false
 
   override def run(): Unit = {
-    val receiver = new Receiver(socket, new ConsolePrintHandler)
+    val receiver = new Receiver(socket, new Handler {
+      override def handle(message: Message): Unit = {
+        println(message)
+      }
+    })
     receiver.listen()
 
     val sender = new Sender(socket)
@@ -25,8 +30,8 @@ class TestClient extends Runnable {
 
     while(true) {
       val body = in.nextLine()
-      val message = ChatMessage("1234", 1, 2, ChatMessage.USER, body)
-      sender.send(message.serialize())
+      val message = AuthRequest("1", "1")
+      sender.send(message)
     }
   }
 }

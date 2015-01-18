@@ -1,7 +1,9 @@
 package server.authentication
 
+import server.messages.AuthRequest
+
 class Authenticator {
-  def authenticate(m: String): Boolean = {
+  def authenticate(msg: AuthRequest): Boolean = {
     return true
   }
 }
