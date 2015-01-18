@@ -45,7 +45,7 @@ class Registry {
 
   def unregister(id: Int) = {
     userMap.synchronized {
-      userMap - id
+      userMap -= id
     }
   }
 
