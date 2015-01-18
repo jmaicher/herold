@@ -5,6 +5,7 @@ import spray.json._
 object MessageJsonProtocol extends DefaultJsonProtocol {
   implicit val authRequestFormat = jsonFormat3(AuthRequest.apply)
   implicit val chatMessageFormat = jsonFormat6(ChatMessage.apply)
+  implicit val serverReplyFormat = jsonFormat3(ServerReply.apply)
 }
 
 import MessageJsonProtocol._
@@ -24,6 +25,7 @@ object Message {
     jsonObj.getFields("id").headOption.flatMap(value => value match {
       case JsString(AuthRequest.id) => Some(jsonObj.convertTo[AuthRequest])
       case JsString(ChatMessage.id) => Some(jsonObj.convertTo[ChatMessage])
+      case JsString(ServerReply.id) => Some(jsonObj.convertTo[ServerReply])
       case _ => None
     })
   }
@@ -56,6 +58,9 @@ object ChatMessage {
 
 
 case class ServerReply(id: String, uuid: String, status: Int)
+  extends Message {
+  override def serialize(): String = this.toJson.compactPrint
+}
 
 object ServerReply {
   val id = "r"
@@ -64,5 +69,5 @@ object ServerReply {
   val OK = 200
   val ACCEPTED = 202
   val BAD_REQUEST = 400
-  val UNAUTHORIZED = 401
+  val NOT_FOUND = 404
 }

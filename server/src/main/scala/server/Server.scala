@@ -1,13 +1,13 @@
 package server
 
 import java.net.{Socket, ServerSocket}
-import java.util.concurrent.{Executors, ExecutorService}
+import java.util.concurrent.{ConcurrentHashMap, ConcurrentMap, Executors, ExecutorService}
 
 import akka.actor.{ActorLogging, Props, ActorSystem, Actor}
 import com.typesafe.scalalogging.{LazyLogging, Logger}
 import server.authentication.Authenticator
 import akka.actor.{Props, ActorSystem, Actor}
-import server.messages.{ChatMessage, AuthRequest, Message}
+import server.messages.{ServerReply, ChatMessage, AuthRequest, Message}
 import server.receiver.{Handler, SendBackHandler, Receiver}
 import server.sender.Sender
 
@@ -49,7 +49,12 @@ class SocketActor(val socket: Socket, val authenticator: Authenticator) extends 
       logger.debug("received: "+msg)
       _sender.send(msg)
     }
-    case _ => logger.debug("received msg that is not handled")
+    case msg: Message => {
+      logger.debug("received unhandled message: " + msg)
+      val reply = ServerReply(msg.uuid, ServerReply.NOT_FOUND)
+      _sender.send(reply)
+    }
+    case _ =>
   }
 
   //default receive when not authenticated yet
@@ -59,12 +64,19 @@ class SocketActor(val socket: Socket, val authenticator: Authenticator) extends 
       if (authenticator.authenticate(msg)) {
         become(authenticated)
         logger.debug("authentication successful")
-        //_sender.send(m) // TODO: success message?
+        val reply = ServerReply(msg.uuid, ServerReply.OK)
+        _sender.send(reply)
       } else {
         logger.debug("authentication failed")
-        //_sender.send(m) // TODO: error message?
+        val reply = ServerReply(msg.uuid, ServerReply.BAD_REQUEST)
+        _sender.send(reply)
       }
     }
-    case _ => logger.debug("received msg that is not handled")
+    case msg: Message => {
+      logger.debug("received unhandled message: " + msg)
+      val reply = ServerReply(msg.uuid, ServerReply.NOT_FOUND)
+      _sender.send(reply)
+    }
+    case _ =>
   }
 }
