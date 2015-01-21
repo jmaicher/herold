@@ -1,13 +1,12 @@
 package server
 
 import java.net.{Socket, ServerSocket}
-
-import akka.actor._
-import com.typesafe.scalalogging.{LazyLogging}
-import server.authentication.{User, Authenticator}
-import server.messages.{ServerReply, ChatMessage, AuthRequest, Message}
+import java.util.concurrent.{Executors, ExecutorService}
+import server.controller.MessageController
+import server.messages.Message
 import server.receiver.{Handler, Receiver}
 import server.sender.Sender
+import scala.reflect.runtime.universe._
 
 object Server {
   def main(args: Array[String]): Unit = {
@@ -15,102 +14,96 @@ object Server {
   }
 }
 
-class Server(port: Int, poolSize: Int) extends Runnable with LazyLogging {
+class Server(port: Int, poolSize: Int) extends Runnable {
   val serverSocket = new ServerSocket(port)
-  val system = ActorSystem()
-  val authenticator = new Authenticator
-  val registry = new Registry
-  val broker = system.actorOf(Props(classOf[MessageBroker], registry))
+  val pool: ExecutorService = Executors.newFixedThreadPool(poolSize)
 
   def run(): Unit = {
-    logger.info("server is running")
     try {
       while (true) {
-          system.actorOf(Props(classOf[SocketActor], serverSocket.accept(), authenticator, registry, broker))
+        val socket = serverSocket.accept()
+        pool.execute(new SocketHandler(socket))
       }
     } finally {
-      system.shutdown()
+      pool.shutdown()
     }
   }
 }
 
-class Registry {
-  private val userMap = new scala.collection.mutable.LinkedHashMap[Int, ActorRef]
-
-  def register(id: Int, actor: ActorRef) = {
-    userMap.synchronized {
-      userMap += id -> actor
-    }
-  }
-
-  def unregister(id: Int) = {
-    userMap.synchronized {
-      userMap -= id
-    }
-  }
-
-  def getActorFor(id: Int): Option[ActorRef] = {
-    userMap.synchronized {
-      userMap.get(id)
-    }
+class SocketHandler(socket: Socket) extends Runnable {
+  def run(): Unit = {
+    val receiver = new Receiver(socket, Router)
+    receiver.listen()
   }
 }
 
-class MessageBroker(val registry: Registry) extends Actor with LazyLogging {
-  def receive = {
-    case msg: ChatMessage => registry.getActorFor(msg.to) match {
-      case Some(actor) => actor forward msg
-      case _ => {
-        sender() ! ServerReply(msg.uuid, ServerReply.ACCEPTED)
-        logger.debug("Cannot deliver message, recipient $msg.to not connected")
-      }
-    }
-    case _ =>
-  }
-}
+object Router extends Handler {
+  private val mirror = runtimeMirror(getClass.getClassLoader)
+  private var methodReflCache = Map[String, MethodMirror]()
+  private var controllerReflCache = Map[String, InstanceMirror]()
+  var time: Long = 0
+  val useReflection = false
 
-class SocketActor(val socket: Socket, val authenticator: Authenticator, val registry: Registry, val broker: ActorRef)
-  extends Actor with Handler with LazyLogging {
-
-  import context._
-  private val _sender = new Sender(socket)
-  private val receiver = new Receiver(socket, this)
-  receiver.listen()
+  private val routing = Map(
+    "message" -> new MessageController
+  )
 
   override def handle(message: Message): Unit = {
-    self ! message
-  }
+    if(!useReflection) {
+      val routingParts = message.action.split("/")
+      if (routingParts.size == 2) {
+        routing.get(routingParts(0)) match {
+          case Some(controller) => {
+            controller.send(message.params(0).toString)
+          }
+          case None => //BAM
+        }
+      }
+    }
+    else {
+      methodReflCache.get(message.action) match {
+        case Some(m) => m(message.params: _*)
+        case None => {
+          val routingParts = message.action.split("/")
+          if (routingParts.size == 2) {
+            try {
+              routing.get(routingParts(0)) match {
+                case Some(controller) => {
+                  val im: InstanceMirror = {
+                    controllerReflCache.get(routingParts(0)) match {
+                      case Some(cim) => cim
+                      case None => {
+                        val im = mirror.reflect(controller)
+                        controllerReflCache += routingParts(0) -> im
+                        im
+                      }
+                    }
+                  }
 
-  def authenticated(user: User): Receive = {
-    case msg: ChatMessage => msg.to match {
-      case user.id => {
-        _sender.send(msg)
-        sender() ! ServerReply(msg.uuid, ServerReply.OK)
+                  val method = im.symbol.typeSignature.member(newTermName(routingParts(1))).asMethod
+                  val reflectMethod = im.reflectMethod(method)
+                  methodReflCache += message.action -> reflectMethod
+                  reflectMethod(message.params: _*)
+                }
+                case None => //BAM
+              }
+            }
+            catch {
+              case e: ScalaReflectionException => //BAM
+            }
+          }
+          else {
+            //BAM
+          }
+        }
       }
-      case _ => broker ! msg
     }
-    case reply: ServerReply => {
-      _sender.send(reply)
-    }
-    case _ =>
-  }
 
-  //default receive when not authenticated yet
-  def receive = {
-    case authReq: AuthRequest => authenticator.authenticate(authReq) match {
-      case Some(user) => {
-        become(authenticated(user))
-        registry.register(user.id, self)
-        logger.debug("authentication successful")
-        val reply = ServerReply(authReq.uuid, ServerReply.OK)
-        _sender.send(reply)
-      }
-      case _ => {
-        logger.debug("authentication failed")
-        val reply = ServerReply(authReq.uuid, ServerReply.BAD_REQUEST)
-        _sender.send(reply)
-      }
+    if(message.id.equals("1")) {
+      time = System.currentTimeMillis()
     }
-    case _ =>
+    else if(message.id.equals("10000")) {
+      println((System.currentTimeMillis()-time)/1000f)
+    }
   }
 }
