@@ -2,12 +2,13 @@ package server.routing
 
 import java.lang.reflect.InvocationTargetException
 import java.util.concurrent.ConcurrentHashMap
+import server.{Context, Registry}
 import server.controller.MessageController
 import server.messages.Message
 import server.receiver.Handler
 import scala.reflect.runtime.universe._
 
-class Router extends Handler {
+class Router(val registry: Registry) extends Handler {
   private val mirror = runtimeMirror(getClass.getClassLoader)
   private val methodReflCache = new ConcurrentHashMap[String, MethodMirror]()
   private val controllerReflCache = new ConcurrentHashMap[String, InstanceMirror]()
@@ -20,6 +21,7 @@ class Router extends Handler {
     getReflectedMethod(message.action) match {
       case Some(m) => {
         try {
+          implicit val context = new Context(registry)
           m(message.params:_*)
         }
         catch {

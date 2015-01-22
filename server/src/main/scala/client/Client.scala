@@ -1,7 +1,7 @@
 package client
 
 import java.net.{InetAddress, Socket}
-import java.util.Date
+import java.util.{Scanner}
 import java.util.concurrent.{Executors, ExecutorService}
 
 import com.typesafe.scalalogging.LazyLogging
@@ -12,9 +12,7 @@ import server.sender.Sender
 object Client {
   def main(args: Array[String]) {
     val pool: ExecutorService = Executors.newFixedThreadPool(10)
-    for(i <- Range(0,10)) {
-      pool.execute(new TestClient())
-    }
+    pool.execute(new TestClient())
   }
 }
 
@@ -27,17 +25,12 @@ class TestClient extends Runnable with LazyLogging {
   }
 
   def authenticate(): Unit = {
-    /*
     val in = new Scanner(System.in)
 
-    println("Please enter user id")
-    val id = in.nextInt()
+    println("Please enter user name")
+    val name = in.next()
 
-    println("Please enter token")
-    val token = in.nextLine()
-
-    val authRequest = AuthRequest("1", id, token)
-    */
+    //val authRequest = AuthRequest("1", id, token)
 
     val receiver = new Receiver(socket, new Handler {
       override def handle(message: Message): Unit = {
@@ -46,9 +39,7 @@ class TestClient extends Runnable with LazyLogging {
     })
     receiver.listen()
 
-    for(i <- Range(0,10000)) {
-      sender.send(Message("message/send", List("dmaicher", "jmaicher", "Ping")))
-    }
+    sender.send(Message("message/send", List("dmaicher", "jmaicher", "Ping")))
   }
 
   /*
