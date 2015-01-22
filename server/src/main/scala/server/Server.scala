@@ -1,6 +1,8 @@
 package server
 
+import java.lang.reflect.InvocationTargetException
 import java.net.{Socket, ServerSocket}
+import java.util.Date
 import java.util.concurrent.{Executors, ExecutorService}
 import server.controller.MessageController
 import server.messages.Message
@@ -42,61 +44,23 @@ object Router extends Handler {
   private var methodReflCache = Map[String, MethodMirror]()
   private var controllerReflCache = Map[String, InstanceMirror]()
   var time: Long = 0
-  val useReflection = false
 
   private val routing = Map(
     "message" -> new MessageController
   )
 
   override def handle(message: Message): Unit = {
-    if(!useReflection) {
-      val routingParts = message.action.split("/")
-      if (routingParts.size == 2) {
-        routing.get(routingParts(0)) match {
-          case Some(controller) => {
-            controller.send(message.params(0).toString)
-          }
-          case None => //BAM
+    getReflectedMethod(message.action) match {
+      case Some(m) => {
+        try {
+          m(message.params:_*)
+        }
+        catch {
+          case e: IllegalArgumentException => //wrong arguments
+          case e: InvocationTargetException => //error in business logic => 500
         }
       }
-    }
-    else {
-      methodReflCache.get(message.action) match {
-        case Some(m) => m(message.params: _*)
-        case None => {
-          val routingParts = message.action.split("/")
-          if (routingParts.size == 2) {
-            try {
-              routing.get(routingParts(0)) match {
-                case Some(controller) => {
-                  val im: InstanceMirror = {
-                    controllerReflCache.get(routingParts(0)) match {
-                      case Some(cim) => cim
-                      case None => {
-                        val im = mirror.reflect(controller)
-                        controllerReflCache += routingParts(0) -> im
-                        im
-                      }
-                    }
-                  }
-
-                  val method = im.symbol.typeSignature.member(newTermName(routingParts(1))).asMethod
-                  val reflectMethod = im.reflectMethod(method)
-                  methodReflCache += message.action -> reflectMethod
-                  reflectMethod(message.params: _*)
-                }
-                case None => //BAM
-              }
-            }
-            catch {
-              case e: ScalaReflectionException => //BAM
-            }
-          }
-          else {
-            //BAM
-          }
-        }
-      }
+      case None => //?
     }
 
     if(message.id.equals("1")) {
@@ -104,6 +68,45 @@ object Router extends Handler {
     }
     else if(message.id.equals("10000")) {
       println((System.currentTimeMillis()-time)/1000f)
+    }
+  }
+
+  private def getReflectedMethod(action: String): Option[MethodMirror] = {
+    methodReflCache.get(action) match {
+      case Some(m) => Some(m)
+      case None => {
+        val routingParts = action.split("/")
+        if (routingParts.size == 2) {
+          try {
+            routing.get(routingParts(0)) match {
+              case Some(controller) => {
+                val im: InstanceMirror = {
+                  controllerReflCache.get(routingParts(0)) match {
+                    case Some(cim) => cim
+                    case None => {
+                      val im = mirror.reflect(controller)
+                      controllerReflCache += routingParts(0) -> im
+                      im
+                    }
+                  }
+                }
+
+                val method = im.symbol.typeSignature.member(newTermName(routingParts(1))).asMethod
+                val reflMethod = im.reflectMethod(method)
+                methodReflCache += action -> reflMethod
+                Some(reflMethod)
+              }
+              case None => None
+            }
+          }
+          catch {
+            case e: ScalaReflectionException => None
+          }
+        }
+        else {
+          None
+        }
+      }
     }
   }
 }

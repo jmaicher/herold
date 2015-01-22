@@ -10,5 +10,5 @@ libraryDependencies ++= Seq(
   "org.slf4j" % "slf4j-simple" % "1.7.10",
   "org.slf4j" % "slf4j-api" % "1.7.10",
   "com.typesafe.scala-logging" % "scala-logging_2.11" % "3.1.0",
-  "com.fasterxml.jackson.module" % "jackson-module-scala_2.11" % "2.4.4"
+  "com.fasterxml.jackson.module" % "jackson-module-jaxb-annotations" % "2.5.0"
 )
