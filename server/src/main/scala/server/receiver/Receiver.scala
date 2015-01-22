@@ -17,7 +17,7 @@ class Receiver(val socket: Socket, val handler: Handler) extends LazyLogging {
         val in = new BufferedSource(socket.getInputStream).getLines()
         while(in.hasNext) {
           val rawMessage = in.next()
-          //logger.debug(rawMessage)
+          logger.debug(rawMessage)
           val mapper = new ObjectMapper with ScalaObjectMapper
           mapper.registerModule(DefaultScalaModule)
           val message = mapper.readValue[Message](rawMessage)

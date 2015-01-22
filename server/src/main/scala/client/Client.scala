@@ -2,6 +2,7 @@ package client
 
 import java.net.{InetAddress, Socket}
 import java.util.Date
+import java.util.concurrent.{Executors, ExecutorService}
 
 import com.typesafe.scalalogging.LazyLogging
 import server.messages.{Message}
@@ -10,7 +11,10 @@ import server.sender.Sender
 
 object Client {
   def main(args: Array[String]) {
-    new TestClient().run()
+    val pool: ExecutorService = Executors.newFixedThreadPool(10)
+    for(i <- Range(0,10)) {
+      pool.execute(new TestClient())
+    }
   }
 }
 
@@ -42,9 +46,9 @@ class TestClient extends Runnable with LazyLogging {
     })
     receiver.listen()
 
-    //for(i <- Range(0,10000)) {
+    for(i <- Range(0,10000)) {
       sender.send(Message("message/send", List("This is an awesome message!", 1, 2.0, 1, List("bla"), Map("foo" -> "bar"))))
-   // }
+    }
   }
 
   /*
