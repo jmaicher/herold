@@ -9,5 +9,10 @@ libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-actor" % "2.3.8",
   "org.slf4j" % "slf4j-simple" % "1.7.10",
   "org.slf4j" % "slf4j-api" % "1.7.10",
+<<<<<<< Updated upstream
   "com.typesafe.scala-logging" % "scala-logging_2.11" % "3.1.0"
+=======
+  "com.typesafe.scala-logging" % "scala-logging_2.11" % "3.1.0",
+  "com.fasterxml.jackson.module" % "jackson-module-scala_2.11" % "2.4.4"
+>>>>>>> Stashed changes
 )
