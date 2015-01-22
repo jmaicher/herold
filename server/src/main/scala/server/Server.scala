@@ -3,6 +3,7 @@ package server
 import java.net.{ServerSocket, Socket}
 import java.util.concurrent.{ConcurrentHashMap, ExecutorService, Executors}
 
+import server.messages.RpcRequest
 import server.receiver.Receiver
 import server.routing.Router
 import server.sender.Sender
@@ -33,7 +34,7 @@ class Server(port: Int, poolSize: Int) extends Runnable {
 
 class ClientSocket(socket: Socket, router: Router) extends Runnable {
   def run(): Unit = {
-    val receiver = new Receiver(socket, router)
+    val receiver = new Receiver[RpcRequest](socket, router)
     receiver.listen()
   }
 }
@@ -50,6 +51,7 @@ class Registry {
   }
 }
 
-class Context(private val registry: Registry) {
+class Context(private val client: Sender, private val registry: Registry) {
+  def getClient = client
   def getRegistry = registry
 }

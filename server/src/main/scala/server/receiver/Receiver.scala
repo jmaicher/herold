@@ -7,10 +7,11 @@ import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import com.fasterxml.jackson.module.scala.experimental.ScalaObjectMapper
 import com.typesafe.scalalogging.LazyLogging
 import server.messages.Message
+import server.sender.Sender
 
 import scala.io.BufferedSource
 
-class Receiver(val socket: Socket, val handler: Handler) extends LazyLogging {
+class Receiver[T<:Message](val socket: Socket, val handler: Handler) extends LazyLogging {
   def listen(): Unit = {
     new Thread(new Runnable {
       override def run(): Unit = {
@@ -20,8 +21,8 @@ class Receiver(val socket: Socket, val handler: Handler) extends LazyLogging {
           logger.debug(rawMessage)
           val mapper = new ObjectMapper with ScalaObjectMapper
           mapper.registerModule(DefaultScalaModule)
-          val message = mapper.readValue[Message](rawMessage)
-          handler.handle(message)
+          val message = mapper.readValue[T](rawMessage)
+          handler.handle(new Sender(socket), message)
         }
       }
     }).start()

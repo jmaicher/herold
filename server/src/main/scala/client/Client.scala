@@ -1,11 +1,11 @@
 package client
 
 import java.net.{InetAddress, Socket}
-import java.util.{Scanner}
+import java.util.Scanner
 import java.util.concurrent.{Executors, ExecutorService}
 
 import com.typesafe.scalalogging.LazyLogging
-import server.messages.{Message}
+import server.messages.{Message, Event, RpcRequest}
 import server.receiver.{Handler, Receiver}
 import server.sender.Sender
 
@@ -30,44 +30,39 @@ class TestClient extends Runnable with LazyLogging {
     println("Please enter user name")
     val name = in.next()
 
-    //val authRequest = AuthRequest("1", id, token)
+    val authRequest = RpcRequest("sessions/post", List(name))
+    sender.send(authRequest)
 
-    val receiver = new Receiver(socket, new Handler {
-      override def handle(message: Message): Unit = {
-
-      }
-    })
-    receiver.listen()
-
-    sender.send(Message("message/send", List("dmaicher", "jmaicher", "Ping")))
+    startChat(name)
   }
 
-  /*
-  def startChat(userId: Int): Unit = {
+  def startChat(name: String): Unit = {
 
-    val receiver = new Receiver(socket, new Handler {
-      override def handle(message: Message): Unit = {
-        logger.debug("received msg: "+message)
-        message match {
-          case msg: ChatMessage => {
-            println("#"+msg.from+": "+msg.body)
+    val receiver = new Receiver[Event](socket, new Handler {
+      override def handle(sender: Sender, message: Message): Unit = message match {
+        case Event(name, args) => {
+          logger.debug("received event: "+name)
+          name match {
+            case "message" => {
+              println("#"+args(0)+": "+args(1))
+            }
+            case _ =>
           }
-          case _ =>
         }
+        case _ =>
       }
     })
     receiver.listen()
 
     val in = new Scanner(System.in)
 
-    println("Enter user id you want to chat with")
-    val toUserId = in.nextInt()
+    println("Enter user name you want to chat with")
+    val toUser = in.next()
 
     while(true) {
       val body = in.nextLine()
-      val message = ChatMessage("2", userId.toInt, toUserId.toInt, "user", body)
+      val message = RpcRequest("message/send", List(name, toUser, body))
       sender.send(message)
     }
   }
-  */
 }

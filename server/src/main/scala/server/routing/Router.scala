@@ -2,9 +2,10 @@ package server.routing
 
 import java.lang.reflect.InvocationTargetException
 import java.util.concurrent.ConcurrentHashMap
+import server.sender.Sender
 import server.{Context, Registry}
-import server.controller.MessageController
-import server.messages.Message
+import server.controller.{SessionsController, MessageController}
+import server.messages.{Message, RpcRequest}
 import server.receiver.Handler
 import scala.reflect.runtime.universe._
 
@@ -14,22 +15,25 @@ class Router(val registry: Registry) extends Handler {
   private val controllerReflCache = new ConcurrentHashMap[String, InstanceMirror]()
 
   private val routing = Map(
-    "message" -> new MessageController
+    "message" -> new MessageController,
+    "sessions" -> new SessionsController
   )
 
-  override def handle(message: Message): Unit = {
-    getReflectedMethod(message.action) match {
-      case Some(m) => {
-        try {
-          implicit val context = new Context(registry)
-          m(message.params:_*)
+  override def handle(sender: Sender, message: Message): Unit = message match {
+    case RpcRequest(method, args) => {
+      getReflectedMethod(method) match {
+        case Some(m) => {
+          try {
+            implicit val context = new Context(sender, registry)
+            m(context::args: _*)
+          }
+          catch {
+            case e: IllegalArgumentException => //wrong arguments
+            case e: InvocationTargetException => //error in business logic => 500
+          }
         }
-        catch {
-          case e: IllegalArgumentException => //wrong arguments
-          case e: InvocationTargetException => //error in business logic => 500
-        }
+        case None => //?
       }
-      case None => //?
     }
   }
 
