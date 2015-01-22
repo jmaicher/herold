@@ -1,10 +1,10 @@
 package client
 
 import java.net.{InetAddress, Socket}
-import java.util.Scanner
+import java.util.Date
 
 import com.typesafe.scalalogging.LazyLogging
-import server.messages.{ServerReply, ChatMessage, Message, AuthRequest}
+import server.messages.{Message}
 import server.receiver.{Handler, Receiver}
 import server.sender.Sender
 
@@ -23,6 +23,7 @@ class TestClient extends Runnable with LazyLogging {
   }
 
   def authenticate(): Unit = {
+    /*
     val in = new Scanner(System.in)
 
     println("Please enter user id")
@@ -32,31 +33,21 @@ class TestClient extends Runnable with LazyLogging {
     val token = in.nextLine()
 
     val authRequest = AuthRequest("1", id, token)
+    */
 
     val receiver = new Receiver(socket, new Handler {
       override def handle(message: Message): Unit = {
-        logger.debug("received msg: "+message)
-        message match {
-          case msg: ServerReply => {
-            if(msg.uuid == authRequest.uuid) {
-              if(msg.status == ServerReply.OK) {
-                logger.debug("Authenticated successfully!")
-                startChat(authRequest.userId)
-              }
-              else {
-                logger.warn("Authentication failed!")
-              }
-            }
-          }
-          case _ =>
-        }
+
       }
     })
     receiver.listen()
 
-    sender.send(authRequest)
+    //for(i <- Range(0,10000)) {
+      sender.send(Message("message/send", List("This is an awesome message!", 1, 2.0, 1, List("bla"), Map("foo" -> "bar"))))
+   // }
   }
 
+  /*
   def startChat(userId: Int): Unit = {
 
     val receiver = new Receiver(socket, new Handler {
@@ -83,4 +74,5 @@ class TestClient extends Runnable with LazyLogging {
       sender.send(message)
     }
   }
+  */
 }
