@@ -1,73 +1,14 @@
 package server.messages
 
-import spray.json._
+import java.util.concurrent.atomic.AtomicInteger
 
-object MessageJsonProtocol extends DefaultJsonProtocol {
-  implicit val authRequestFormat = jsonFormat4(AuthRequest.apply)
-  implicit val chatMessageFormat = jsonFormat6(ChatMessage.apply)
-  implicit val serverReplyFormat = jsonFormat3(ServerReply.apply)
-}
-
-import MessageJsonProtocol._
-
-sealed trait Message {
-  val id: String
-  val uuid: String
-
-  def serialize(): String
+case class Message(action: String, params: List[Any]) {
+  val id = Message.getId()
 }
 
 object Message {
-
-  def deserialize(serialized: String): Option[Message] = {
-    val jsonObj = serialized.parseJson.asJsObject
-
-    jsonObj.getFields("id").headOption.flatMap(value => value match {
-      case JsString(AuthRequest.id) => Some(jsonObj.convertTo[AuthRequest])
-      case JsString(ChatMessage.id) => Some(jsonObj.convertTo[ChatMessage])
-      case JsString(ServerReply.id) => Some(jsonObj.convertTo[ServerReply])
-      case _ => None
-    })
+  private val refCounter = new AtomicInteger()
+  def getId(): String = {
+    refCounter.incrementAndGet().toString
   }
-
-}
-
-case class AuthRequest(id: String, uuid: String, userId: Int, token: String)
-  extends Message {
-  override def serialize(): String = this.toJson.compactPrint
-}
-
-object AuthRequest {
-  val id = "a"
-  def apply(uuid: String, userId: Int, token: String): AuthRequest = apply(id, uuid, userId, token)
-}
-
-case class ChatMessage(id: String, uuid: String, from: Int, to: Int, toType: String, body: String)
-  extends Message {
-  override def serialize(): String = this.toJson.compactPrint
-}
-
-object ChatMessage {
-  val id = "m"
-  def apply(uuid: String, from: Int, to: Int, toType: String, body: String): ChatMessage =
-    apply(id, uuid, from, to, toType, body)
-
-  val USER = "u"
-  val GROUP = "g"
-}
-
-
-case class ServerReply(id: String, uuid: String, status: Int)
-  extends Message {
-  override def serialize(): String = this.toJson.compactPrint
-}
-
-object ServerReply {
-  val id = "r"
-  def apply(uuid: String, status: Int): ServerReply = apply(id, uuid, status)
-
-  val OK = 200
-  val ACCEPTED = 202
-  val BAD_REQUEST = 400
-  val NOT_FOUND = 404
 }
