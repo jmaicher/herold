@@ -47,7 +47,7 @@ class TestClient extends Runnable with LazyLogging {
     receiver.listen()
 
     for(i <- Range(0,10000)) {
-      sender.send(Message("message/send", List("This is an awesome message!", 1, 2.0, 1, List("bla"), Map("foo" -> "bar"))))
+      sender.send(Message("message/send", List("dmaicher", "jmaicher", "Ping")))
     }
   }
 
