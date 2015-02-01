@@ -57,7 +57,7 @@ class ClientSocket(val socket: Socket, val serverEventDispatcher: EventDispatche
     })
   }
 
-  def authenticated(username: String): Unit = {
+  def authenticate(username: String): Unit = {
     socketEventDispatcher.register(classOf[SendMessageSocketEvent], new EventListener[SendMessageSocketEvent] {
       def on(e: SendMessageSocketEvent): Unit = {
         serverEventDispatcher.dispatch(new DeliverMessageServerEvent(username, e.to, e.msg, e.date, e.uuid))
@@ -77,7 +77,7 @@ class Authenticator(val registry: Registry, val serverEventDispatcher: EventDisp
       //TODO: use some storage & actually check credentials
       if(!registry.get(e.username).isDefined) {
         logger.debug("Authentication succeeded for @"+e.username)
-        e.clientSocket.authenticated(e.username)
+        e.clientSocket.authenticate(e.username)
         e.clientSocket.send(new AuthSuccessSocketEvent(e.username))
         serverEventDispatcher.dispatch(new AuthenticatedServerEvent(e.username, e.clientSocket))
       }
