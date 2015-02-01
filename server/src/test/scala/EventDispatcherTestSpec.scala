@@ -20,6 +20,10 @@ class EventDispatcherTestSpec extends FlatSpec with Matchers with MockFactory {
     val e3 = new MostSpecificTestEvent
     listener.on _ expects(e3)
     ed.dispatch(e3)
+
+    ed.unregister(listener)
+    listener.on _ expects(*) never()
+    ed.dispatch(e1)
   }
 }
 
