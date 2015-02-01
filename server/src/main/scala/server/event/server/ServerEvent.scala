@@ -1,13 +1,15 @@
 package server.event.server
 
 import java.util.Date
-import common.event.EventDispatcher
-import common.event.socket.SocketEvent
+import server.ClientSocket
 
 abstract class ServerEvent
 
-class AuthRequestServerEvent(val username: String, val password: String, val socketEventDispatcher: EventDispatcher[SocketEvent]) extends ServerEvent
-class AuthSuccessServerEvent(val username: String, val socketEventDispatcher: EventDispatcher[SocketEvent]) extends ServerEvent
+class ClientConnectedServerEvent(val clientSocket: ClientSocket) extends ServerEvent
+class ClientDisconnectedServerEvent(val clientSocket: ClientSocket) extends ServerEvent
+
+class AuthenticationServerEvent(val username: String, val password: String, val clientSocket: ClientSocket) extends ServerEvent
+class AuthenticatedServerEvent(val username: String, val clientSocket: ClientSocket) extends ServerEvent
 
 abstract class UserStatusServerEvent(val username: String) extends ServerEvent
 class UserStatusOnlineServerEvent(username: String) extends UserStatusServerEvent(username)
