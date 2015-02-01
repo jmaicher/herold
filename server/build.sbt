@@ -12,3 +12,7 @@ libraryDependencies ++= Seq(
   "com.typesafe.scala-logging" % "scala-logging_2.11" % "3.1.0",
   "com.fasterxml.jackson.module" % "jackson-module-scala_2.11" % "2.4.4"
 )
+
+mainClass in assembly := Some("server.Server")
+
+assemblyJarName in assembly := "server.jar"

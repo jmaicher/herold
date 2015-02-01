@@ -1,73 +1,141 @@
 package client
 
 import java.net.{InetAddress, Socket}
-import java.util.{Scanner}
+import java.text.SimpleDateFormat
+import java.util.{Date, Scanner}
 import java.util.concurrent.{Executors, ExecutorService}
 
+import common.SocketEventChannel
+import common.event.socket._
 import com.typesafe.scalalogging.LazyLogging
-import server.messages.{Message}
-import server.receiver.{Handler, Receiver}
-import server.sender.Sender
+import common.event.{EventListener, EventDispatcher}
+import server.event._
+
+import scala.util.Random
 
 object Client {
+  //val HOST = "91.66.102.116"
+  val HOST = "192.168.0.108"
+  //val HOST = "localhost"
   def main(args: Array[String]) {
-    val pool: ExecutorService = Executors.newFixedThreadPool(10)
-    pool.execute(new TestClient())
+    val pool: ExecutorService = Executors.newFixedThreadPool(10000)
+    /*
+    val userLimit = 10
+    for(i <- Range(0,userLimit)) {
+      pool.execute(new NonInteractiveTestClient(i.toString, "", Random.nextInt(userLimit).toString))
+    }
+    */
+    pool.execute(new InteractiveTestClient)
   }
 }
 
-class TestClient extends Runnable with LazyLogging {
-  val socket = new Socket(InetAddress.getLocalHost, 2020)
-  val sender = new Sender(socket)
+abstract class Client extends Runnable with LazyLogging {
+  logger.debug("connecting...")
+  protected val eventDispatcher = new EventDispatcher[SocketEvent]
+  protected val socketEventChannel = new SocketEventChannel(new Socket(Client.HOST, 2020))
+}
+
+class NonInteractiveTestClient(val username: String, val password: String, val to: String) extends Client {
+  override def run(): Unit = {
+    eventDispatcher.register(classOf[SocketEvent], new EventListener[SocketEvent] {
+      override def on(event: SocketEvent): Unit = event match {
+        case e: AwaitingAuthSocketEvent => socketEventChannel.send(new AuthRequestSocketEvent(username, password))
+        case e: AuthRequestSocketEvent => socketEventChannel.send(e)
+        case e: AuthFailedSocketEvent =>
+        case e: AuthSuccessSocketEvent => sendRandomMessageWithDelay()
+        case e: ReceiveMessageSocketEvent => sendRandomMessageWithDelay()
+        case e: SendMessageSocketEvent => socketEventChannel.send(e)
+        case _ =>
+      }
+    })
+    socketEventChannel.listen(eventDispatcher)
+  }
+
+  private def sendRandomMessageWithDelay(): Unit = {
+    new Thread(new Runnable {
+      override def run(): Unit = {
+        Thread.sleep(math.max(250,Random.nextInt(1000)))
+        eventDispatcher.dispatch(new SendMessageSocketEvent(to, java.util.UUID.randomUUID.toString))
+      }
+    }).start()
+  }
+}
+
+class InteractiveTestClient extends Client {
+  private val scanner = new Scanner(System.in)
 
   override def run(): Unit = {
-    authenticate()
-  }
-
-  def authenticate(): Unit = {
-    val in = new Scanner(System.in)
-
-    println("Please enter user name")
-    val name = in.next()
-
-    //val authRequest = AuthRequest("1", id, token)
-
-    val receiver = new Receiver(socket, new Handler {
-      override def handle(message: Message): Unit = {
-
+    eventDispatcher.register(classOf[AuthSocketEvent], new EventListener[AuthSocketEvent] {
+      override def on(event: AuthSocketEvent): Unit = event match {
+        case e: AwaitingAuthSocketEvent => requestAuthentication("Please authenticate...")
+        case e: AuthRequestSocketEvent => socketEventChannel.send(e)
+        case e: AuthFailedSocketEvent => requestAuthentication(e.msg)
+        case e: AuthSuccessSocketEvent =>
+          println("Successfully authenticated")
+          startChat(e.username)
+        case _ =>
       }
     })
-    receiver.listen()
-
-    sender.send(Message("message/send", List("dmaicher", "jmaicher", "Ping")))
+    socketEventChannel.listen(eventDispatcher)
   }
 
-  /*
-  def startChat(userId: Int): Unit = {
+  def requestAuthentication(msg: String): Unit = {
+    println(msg)
+    val username = getStringInput("Please enter username")
+    val password = getStringInput("Please enter password")
+    eventDispatcher.dispatch(new AuthRequestSocketEvent(username, password))
+  }
 
-    val receiver = new Receiver(socket, new Handler {
-      override def handle(message: Message): Unit = {
-        logger.debug("received msg: "+message)
-        message match {
-          case msg: ChatMessage => {
-            println("#"+msg.from+": "+msg.body)
+  def startChat(username: String): Unit = {
+
+    eventDispatcher.register(classOf[MessageSocketEvent], new EventListener[MessageSocketEvent] {
+      def on(event: MessageSocketEvent): Unit = event match {
+        case e: ReceiveMessageSocketEvent => printMessage(e.from, e.msg, e.date)
+        case e: SendMessageSocketEvent => socketEventChannel.send(e)
+        case _ =>
+      }
+    })
+
+    println("Write a message to someone with @USERNAME:MESSAGE")
+
+    new Thread(new Runnable {
+      override def run(): Unit = {
+        while(true) {
+          val message = getStringInput()
+          val parts = message.split(":", 2)
+          if(parts.length == 2 && parts(0).startsWith("@") && !parts(1).trim.isEmpty) {
+            val to = parts(0).replaceFirst("@", "")
+            val msg = parts(1).trim
+            if(to.equals(username)) {
+              println("Does not make much sense to send a message to yourself? ;)")
+            }
+            else {
+              printMessage(username, msg, new Date())
+              eventDispatcher.dispatch(new SendMessageSocketEvent(to, msg))
+            }
           }
-          case _ =>
+          else {
+            println("Unknown command!")
+          }
         }
       }
-    })
-    receiver.listen()
-
-    val in = new Scanner(System.in)
-
-    println("Enter user id you want to chat with")
-    val toUserId = in.nextInt()
-
-    while(true) {
-      val body = in.nextLine()
-      val message = ChatMessage("2", userId.toInt, toUserId.toInt, "user", body)
-      sender.send(message)
-    }
+    }).start()
   }
-  */
+
+  def printMessage(name: String, msg: String, date: Date): Unit = {
+    lazy val dateFormat = new SimpleDateFormat("dd.MM.yyyy kk:mm:ss")
+    println("["+dateFormat.format(date)+"] "+name+": "+msg)
+  }
+
+  def getStringInput(msg: String = ""): String = {
+    var in = ""
+    while(in.isEmpty) {
+      if(!msg.isEmpty)
+        println(msg)
+      in = scanner.nextLine()
+    }
+    print("\033[1A")
+    print("\033[2K")
+    in
+  }
 }
