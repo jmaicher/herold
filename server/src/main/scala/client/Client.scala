@@ -14,9 +14,6 @@ import server.event._
 import scala.util.Random
 
 object Client {
-  //val HOST = "91.66.102.116"
-  val HOST = "192.168.0.108"
-  //val HOST = "localhost"
   def main(args: Array[String]) {
     val pool: ExecutorService = Executors.newFixedThreadPool(10000)
     /*
@@ -32,7 +29,7 @@ object Client {
 abstract class Client extends Runnable with LazyLogging {
   logger.debug("connecting...")
   protected val eventDispatcher = new EventDispatcher[SocketEvent]
-  protected val socketEventChannel = new SocketEventChannel(new Socket(Client.HOST, 2020))
+  protected val socketEventChannel = new SocketEventChannel(new Socket(System.getProperty("herold.host", "localhost"), 2020))
 }
 
 class NonInteractiveTestClient(val username: String, val password: String, val to: String) extends Client {
