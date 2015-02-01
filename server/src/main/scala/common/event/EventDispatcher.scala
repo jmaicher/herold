@@ -24,13 +24,12 @@ class EventDispatcher[BaseEvent] extends LazyLogging {
 
   def dispatch[E <: BaseEvent](e: E): Unit = {
     logger.debug("Dispatching: "+e)
-    for((c, list) <- listeners) {
-      if(c.isAssignableFrom(e.getClass)) {
-        list foreach { l =>
-          logger.debug("Dispatching to "+l.toString)
-          l.asInstanceOf[EventListener[E]].on(e)
-        }
-      }
+    var c: Class[BaseEvent] = e.getClass.asInstanceOf[Class[BaseEvent]]
+    while(c != null) {
+      listeners.get(c) map { _.foreach({
+        _.asInstanceOf[EventListener[E]].on(e)
+      })}
+      c = c.getSuperclass.asInstanceOf[Class[BaseEvent]]
     }
   }
 }
