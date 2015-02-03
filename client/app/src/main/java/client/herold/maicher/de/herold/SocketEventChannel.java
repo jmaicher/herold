@@ -1,16 +1,20 @@
 package client.herold.maicher.de.herold;
 
-import android.app.IntentService;
+import android.app.AlarmManager;
 import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.app.Service;
+import android.content.Context;
 import android.content.Intent;
 import android.os.IBinder;
+import android.os.SystemClock;
 import android.support.v4.app.NotificationCompat;
 import android.util.Log;
 
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.PropertyAccessor;
 import com.fasterxml.jackson.databind.ObjectMapper;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -26,6 +30,7 @@ public class SocketEventChannel extends Service {
 
     public static final String INTENT_SEND_EVENT = "de.maicher.herold.intent.send_event";
     public static final String INTENT_RECEIVED_EVENT = "de.maicher.herold.intent.received_event";
+    private static final int RECONNECT_TIMEOUT = 500; //ms
     private static ObjectMapper mapper = new ObjectMapper();
     static {
         mapper.enableDefaultTyping();
@@ -35,45 +40,78 @@ public class SocketEventChannel extends Service {
     private Socket socket;
     private PrintStream out;
 
-    public SocketEventChannel() {
+    @Override
+    public void onCreate() {
+        super.onCreate();
         connect();
-        Log.d("SocketEventChannel", "Instantiated...");
+        Log.d("SocketEventChannel", "onCreate");
     }
 
     private void connect() {
         new Thread(new Runnable() {
             @Override
             public void run() {
-                try{
-                    Log.d("SocketEventChannel", "connecting");
-                    socket = new Socket("10.0.2.1", 2020);
-                    BufferedReader buffer = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-                    for (String line; (line = buffer.readLine()) != null;) {
-                        Log.d("SocketEventChannel", "Received: "+line);
-                        SocketEvent event = null;
-                        try {
-                            event = mapper.readValue(line, SocketEvent.class);
-                        }
-                        catch (IllegalArgumentException e) {
-                            Log.e("SocketEventChannel", "Error deserializing event: "+e);
-                        }
+                while (!Thread.interrupted()) {
+                    try {
+                        Log.d("SocketEventChannel", "connecting");
+                        socket = new Socket("192.168.0.100", 2020);
+                        BufferedReader buffer = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+                        for (String line; (line = buffer.readLine()) != null; ) {
+                            if(!line.isEmpty()) {
+                                Log.d("SocketEventChannel", "Received: " + line);
+                                SocketEvent event = null;
+                                try {
+                                    event = mapper.readValue(line, SocketEvent.class);
+                                } catch (IllegalArgumentException e) {
+                                    Log.e("SocketEventChannel", "Error deserializing event: " + e);
+                                }
 
-                        if(event != null) {
-                            onSocketEvent(event);
+                                if (event != null) {
+                                    onSocketEvent(event);
+                                }
+                            }
+                        }
+                    } catch (IOException e) {
+                        Log.e("SocketEventChannel", "Socket read error: " + e);
+                    } finally {
+                        socket = null;
+                        out = null;
+                        Log.d("SocketEventChannel", "Waiting "+RECONNECT_TIMEOUT+"ms and reconnecting.");
+                        try{
+                            Thread.sleep(RECONNECT_TIMEOUT);
+                        }
+                        catch(InterruptedException e) {}
+                    }
+                }
+            }
+        }).start();
+
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                while(true) {
+                    try{
+                        if(socket != null) {
+                            if(out == null) {
+                                out = new PrintStream(socket.getOutputStream());
+                            }
+                            out.println("");
+                            out.flush();
+                            Log.d("SocketEventChannel", "Heartbeat ok");
                         }
                     }
-                }
-                catch (IOException e) {
-                    Log.e("SocketEventChannel", "Socket read error: " + e);
-                }
-                finally {
-                    try{
-                        socket.close();
+                    catch (IOException e) {
+                        Log.e("SocketEventChannel", "Socket write error: "+e);
+                        out.close();
                     }
-                    catch (IOException e) { }
-                    socket = null;
+
+                    try {
+                        Thread.sleep(2500);
+                    }
+                    catch (InterruptedException e) {
+                        
+                    }
                 }
-                Log.d("SocketEventChannel", "Stopped.");
             }
         }).start();
     }
@@ -109,11 +147,29 @@ public class SocketEventChannel extends Service {
         }
         catch (IOException e) {
             Log.e("SocketEventChannel", "Socket write error: "+e);
-            try{
-                socket.close();
-                out.close();
-            }
-            catch (IOException e2) { }
+            out.close();
         }
+    }
+
+    private void sendString(String s) {
+
+    }
+
+    @Override
+    public int onStartCommand(Intent intent, int flags, int startId) {
+        Log.d("SocketEventChannel", "onStartCommand");
+        return START_STICKY;
+    }
+
+    @Override
+    public void onTaskRemoved(Intent rootIntent) {
+        Log.d("SocketEventChannel", "onTaskRemoved");
+        Intent restartService = new Intent(getApplicationContext(), this.getClass());
+        restartService.setPackage(getPackageName());
+        PendingIntent pi = PendingIntent.getService(getApplicationContext(), 1, restartService, PendingIntent.FLAG_ONE_SHOT);
+
+        //Restart the service once it has been killed android
+        AlarmManager alarmService = (AlarmManager)getApplicationContext().getSystemService(Context.ALARM_SERVICE);
+        alarmService.set(AlarmManager.ELAPSED_REALTIME, SystemClock.elapsedRealtime()+RECONNECT_TIMEOUT, pi);
     }
 }
