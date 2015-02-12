@@ -109,7 +109,7 @@ public class SocketEventChannel extends Service {
                         Thread.sleep(2500);
                     }
                     catch (InterruptedException e) {
-                        
+
                     }
                 }
             }

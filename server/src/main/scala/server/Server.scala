@@ -1,21 +1,98 @@
 package server
 
-import java.net.{ServerSocket, Socket}
-import java.util.concurrent.{ConcurrentLinkedQueue, ConcurrentHashMap, ExecutorService, Executors}
-import _root_.server.event.server._
-import common.{SocketDisconnectHandler, SocketEventChannel}
-import common.event.socket._
 import com.typesafe.scalalogging.LazyLogging
-import common.event.{EventListener, EventDispatcher}
+import org.glassfish.grizzly.http.Cookie
+import org.glassfish.grizzly.http.server._
+import org.glassfish.grizzly.http.util.HttpStatus
+import org.glassfish.grizzly.websockets._
 
 object Server {
   def main(args: Array[String]): Unit = {
-    new Server(2020, 10000).run()
+
+    val server = HttpServer.createSimpleServer(null, 8080)
+
+    val authenticator = new UserRegistry()
+    authenticator.addUser(new User("David", "mail@dmaicher.de", "test"))
+
+    server.getListener("grizzly").registerAddOn(new WebSocketAddOn())
+    server.getServerConfiguration.addHttpHandler(new AuthenticationHandler(authenticator), "/auth")
+    WebSocketEngine.getEngine.register("", "/chat", new ChatApplication(authenticator))
+
+    server.start()
+    Thread.sleep(Long.MaxValue)
   }
 }
 
-class Server(val port: Int, val poolSize: Int) extends Runnable with LazyLogging {
-  private val serverSocket = new ServerSocket(port)
+class User(var name: String, var email: String, var password: String)
+
+class UserRegistry {
+  private var emailToUser = Map[String, User]()
+  private var accessTokenToUser = Map[String, User]()
+
+  def addUser(u: User): Unit = {
+    emailToUser += u.email -> u
+  }
+
+  def addAccessToken(u: User, t: String): Unit = {
+    accessTokenToUser += t -> u
+  }
+
+  def getUserByEmail(e: String): Option[User]= {
+    emailToUser.get(e)
+  }
+
+  def getUserByAccessToken(t: String): Option[User]= {
+    accessTokenToUser.get(t)
+  }
+}
+
+class AuthenticationHandler(userRegistry: UserRegistry) extends HttpHandler {
+  override def service(request: Request, response: Response): Unit = {
+
+    val email = request.getParameter("email")
+    val password = request.getParameter("password")
+
+    val user = userRegistry.getUserByEmail(email)
+    if(user.isDefined && user.get.password.equals(password)){
+      val newToken = java.util.UUID.randomUUID.toString
+      userRegistry.addAccessToken(user.get, newToken)
+      response.setStatus(HttpStatus.OK_200)
+      response.addCookie(new Cookie("Token", newToken))
+    }
+    else {
+      response.setStatus(HttpStatus.FORBIDDEN_403)
+    }
+  }
+}
+
+class ChatApplication(userRegistry: UserRegistry) extends WebSocketApplication with LazyLogging {
+  override def onConnect(socket: WebSocket): Unit = {
+    logger.info("Connected ... " + socket.toString)
+    val defSocket = socket.asInstanceOf[DefaultWebSocket]
+    val accessToken = defSocket.getUpgradeRequest.getCookies find (_.getName.equals("Token"))
+    if(accessToken.isEmpty || userRegistry.getUserByAccessToken(accessToken.get.getValue).isEmpty) {
+      logger.info("NOT AUTHENTICATED!" + socket.toString)
+      socket.close(403, "Access denied")
+    }
+    else {
+      logger.info("Authenticated!" + socket.toString)
+    }
+    super.onConnect(socket)
+  }
+
+  override def onClose(socket: WebSocket, frame: DataFrame): Unit = {
+    super.onClose(socket, frame)
+    logger.info(String.format("Session %s closed",socket.toString))
+  }
+
+  override def onMessage(socket: WebSocket, message: String): Unit = {
+    println(message)
+  }
+}
+
+/*
+
+class Server(val port: Int, val poolSize: Int) extends LazyLogging {
   private val pool: ExecutorService = Executors.newFixedThreadPool(poolSize)
   private val serverEventDispatcher = new EventDispatcher[ServerEvent]
 
@@ -29,9 +106,9 @@ class Server(val port: Int, val poolSize: Int) extends Runnable with LazyLogging
     try {
       logger.debug("Waiting for clients")
       while (true) {
-        val clientSocket = new ClientSocket(serverSocket.accept(), serverEventDispatcher)
-        pool.execute(clientSocket)
-        serverEventDispatcher.dispatch(new ClientConnectedServerEvent(clientSocket))
+        //val clientSocket = new ClientSocket(serverSocket.accept(), serverEventDispatcher)
+        //pool.execute(clientSocket)
+        //serverEventDispatcher.dispatch(new ClientConnectedServerEvent(clientSocket))
       }
     } finally {
       pool.shutdown()
@@ -170,3 +247,4 @@ class Registry(serverEventDispatcher: EventDispatcher[ServerEvent]) {
     }
   })
 }
+*/

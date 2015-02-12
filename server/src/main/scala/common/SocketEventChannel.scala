@@ -9,7 +9,7 @@ import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import com.fasterxml.jackson.module.scala.experimental.ScalaObjectMapper
 import com.typesafe.scalalogging.LazyLogging
 import common.event.EventDispatcher
-import common.event.socket.{AckSocketEvent, SocketEvent}
+import common.event.socket.{SocketEvent}
 
 import scala.io.{Codec, Source}
 

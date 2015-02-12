@@ -1,10 +1,9 @@
 package server.event.server
 
 import java.util.Date
-import server.ClientSocket
 
 abstract class ServerEvent
-
+/*
 class ClientConnectedServerEvent(val clientSocket: ClientSocket) extends ServerEvent
 class ClientDisconnectedServerEvent(val clientSocket: ClientSocket) extends ServerEvent
 
@@ -16,3 +15,4 @@ class UserStatusOnlineServerEvent(username: String) extends UserStatusServerEven
 class UserStatusOfflineServerEvent(username: String) extends UserStatusServerEvent(username)
 
 class DeliverMessageServerEvent(val from: String, val to: String, val msg: String, val date: Date, val refUUID: String, var buffered:Boolean = false) extends ServerEvent
+*/
