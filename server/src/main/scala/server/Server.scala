@@ -20,15 +20,18 @@ object Server {
     val server = HttpServer.createSimpleServer(null, 8080)
 
     val userRegistry = new UserRegistry()
-    userRegistry.addUser(new User(1, "David", "mail@dmaicher.de", "test"))
-    userRegistry.addUser(new User(2, "Julian", "mail@jmaicher.de", "test"))
+    userRegistry.addUser(new User(1, "David", "mail@dmaicher.de", "a94a8fe5ccb19ba61c4c0873d391e987982fbbd3")) //pw=test
+    userRegistry.addUser(new User(2, "Julian", "mail@jmaicher.de", "a94a8fe5ccb19ba61c4c0873d391e987982fbbd3"))
 
     server.getListener("grizzly").registerAddOn(new WebSocketAddOn())
     server.getServerConfiguration.addHttpHandler(new AuthenticationHandler(userRegistry), "/auth")
+    server.getServerConfiguration.addHttpHandler(new CLStaticHttpHandler(
+      classOf[ChatApplication].getClassLoader, "assets/webclient/"
+    ), "/")
     WebSocketEngine.getEngine.register("", "/chat", new ChatApplication(userRegistry))
 
     server.start()
-    Thread.sleep(Long.MaxValue)
+    System.in.read()
   }
 }
 
@@ -51,20 +54,25 @@ object AccessTokenGenerator {
 }
 
 class AuthenticationHandler(userRegistry: UserRegistry) extends HttpHandler {
+  val md = java.security.MessageDigest.getInstance("SHA-1")
+
   override def service(request: Request, response: Response): Unit = {
     val email = request.getParameter("email")
     val password = request.getParameter("password")
+    if(password != null && email != null) {
+      val passwordHash = md.digest(password.getBytes("UTF-8")).map("%02x".format(_)).mkString
+      val user = userRegistry.getUserByEmail(email)
+      if(user.isDefined && user.get.password.equals(passwordHash)){
+        val newToken = AccessTokenGenerator.generate
+        userRegistry.addAccessToken(user.get, newToken)
+        response.setStatus(HttpStatus.OK_200)
+        response.addCookie(new Cookie("token", newToken))
 
-    val user = userRegistry.getUserByEmail(email)
-    if(user.isDefined && user.get.password.equals(password)){
-      val newToken = AccessTokenGenerator.generate
-      userRegistry.addAccessToken(user.get, newToken)
-      response.setStatus(HttpStatus.OK_200)
-      response.addCookie(new Cookie("Token", newToken))
+        return
+      }
     }
-    else {
-      response.setStatus(HttpStatus.FORBIDDEN_403)
-    }
+
+    response.setStatus(HttpStatus.FORBIDDEN_403)
   }
 }
 
@@ -91,7 +99,7 @@ class ChatApplication(userRegistry: UserRegistry) extends WebSocketApplication w
     val header = requestPacket.getHeader("Cookie")
     if(header != null) {
       val cookies = new ServerCookiesBuilder(true, true).parse(header).build()
-      val accessTokenCookie = cookies.findByName("Token")
+      val accessTokenCookie = cookies.findByName("token")
       if(accessTokenCookie != null) {
         val accessToken = accessTokenCookie.getValue
         logger.debug("Found access token. Checking if valid... ")
@@ -103,6 +111,10 @@ class ChatApplication(userRegistry: UserRegistry) extends WebSocketApplication w
     }
     logger.debug("Did not find valid access token.")
     super.createSocket(handler, requestPacket, listeners: _*)
+  }
+
+  override def handshake(handshake: HandShake): Unit = {
+    throw new HandshakeException(403, "test")
   }
 
   override def onClose(socket: WebSocket, frame: DataFrame): Unit = {

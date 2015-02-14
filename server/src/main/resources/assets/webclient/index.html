@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Herold Web Client</title>
+  <meta charset="UTF-8" />
+  <meta content="width=device-width, initial-scale=1" name="viewport">
+  <link rel="stylesheet" href="css/base.css" />
+  <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/bootstrap/3.3.2/css/bootstrap.min.css" />
+  <link rel="stylesheet" href="css/chat.css" />
+  <link rel="stylesheet" href="http://css-spinners.com/css/spinner/three-quarters.css" type="text/css" />
+  <script src="//code.jquery.com/jquery-2.1.3.min.js"></script>
+  <script src="//cdnjs.cloudflare.com/ajax/libs/jquery-cookie/1.4.1/jquery.cookie.min.js"></script>
+  <script src="//maxcdn.bootstrapcdn.com/bootstrap/3.3.2/js/bootstrap.min.js"></script>
+  <script src="js/chat.js"></script>
+</head>
+<body>
+  <div class="container">
+    <div class="loading-container">
+      <div class="three-quarters">Loading...</div>
+    </div>
+    <div id="chat-container" class="hidden">
+      <ul id="chat-message-container" class="clearfix"></ul>
+      <form action="" method="POST" id="message-form">
+        <input type="text" name="message" placeholder="Message" />
+        <button class="btn btn-primary btn-block">Send</button>
+      </form>
+    </div>
+  </div>
+</body>
+</html>

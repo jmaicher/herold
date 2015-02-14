@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Herold Web Client</title>
+  <meta charset="UTF-8" />
+  <meta content="width=device-width, initial-scale=1" name="viewport">
+  <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/bootstrap/3.3.2/css/bootstrap.min.css" />
+  <link rel="stylesheet" href="css/signin.css" />
+  <script src="//code.jquery.com/jquery-2.1.3.min.js"></script>
+  <script src="//maxcdn.bootstrapcdn.com/bootstrap/3.3.2/js/bootstrap.min.js"></script>
+  <script src="js/signin.js"></script>
+</head>
+<body>
+  <div class="container">
+    <form action="" method="POST" class="form-signin">
+      <h2>Please sign in</h2>
+      <div class="credentials-container">
+        <label for="email" class="sr-only">Email address</label>
+        <input type="email" name="email" id="email" class="form-control" placeholder="Email address" required autofocus>
+        <label for="password" class="sr-only">Password</label>
+        <input type="password" name="password" id="password" class="form-control" placeholder="Password" required>
+      </div>
+      <div class="error hidden text-danger">E-Mail and/or password invalid!</div>
+      <div class="checkbox">
+        <label>
+          <input type="checkbox" value="remember-me"> Remember me
+        </label>
+      </div>
+      <button class="btn btn-lg btn-primary btn-block" type="submit">Sign in</button>
+    </form>
+  </div>
+</body>
+</html>
